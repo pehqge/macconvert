@@ -252,6 +252,11 @@ cmd_uninstall() {
 
 cmd_home() {
   [[ -t 0 && -t 1 ]] || { cmd_help; return 0; }
+  # Fresh install (e.g. straight from `brew install`): go directly to setup.
+  if ! mc_services_installed_ids | grep -q .; then
+    cmd_setup
+    return
+  fi
   local enabled_count choice
   while true; do
     enabled_count=$(mc_services_installed_ids | grep -c . || true)

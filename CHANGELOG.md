@@ -4,6 +4,13 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] - 2026-06-10
+
+### Changed
+
+- Running `macconvert` with nothing enabled yet (fresh install) goes straight
+  into setup instead of the home menu.
+
 ## [1.1.0] - 2026-06-10
 
 ### Added
@@ -34,5 +41,6 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   through the same `automator` path Finder uses, including multi-select,
   filename edge cases and collision suffixing.
 
+[1.1.1]: https://github.com/pehqge/macconvert/releases/tag/v1.1.1
 [1.1.0]: https://github.com/pehqge/macconvert/releases/tag/v1.1.0
 [1.0.0]: https://github.com/pehqge/macconvert/releases/tag/v1.0.0
