@@ -1,7 +1,7 @@
 <h1 align="center">MacConvert</h1>
 
 <p align="center">
-  <em>Convert any file from Finder's right-click menu — 45 native Quick Actions, no app windows, no uploads.</em>
+  <em>Convert files from Finder's right-click menu. 45 native Quick Actions, no app windows, no uploads.</em>
 </p>
 
 <p align="center">
@@ -16,9 +16,11 @@
   <img src="assets/hero.png" alt="Finder right-click menu with MacConvert Quick Actions" width="780">
 </p>
 
-Right-click a file → **Quick Actions** → pick a conversion. The output appears
-next to the original. Everything runs locally through proven tools (ffmpeg,
-ImageMagick, Pandoc, Ghostscript…) — your files never leave your Mac.
+Right-click a file, pick a conversion under **Quick Actions**, and the
+converted copy lands next to the original. That's the whole workflow. Behind
+it sit the tools you'd reach for anyway (ffmpeg, ImageMagick, Pandoc,
+Ghostscript), wired into Finder so you never have to open a terminal or, worse,
+upload your files to some converter website.
 
 ## Install
 
@@ -27,15 +29,17 @@ git clone https://github.com/pehqge/macconvert.git
 cd macconvert && ./install.sh
 ```
 
-or, if you prefer a one-liner (feel free to [read install.sh](install.sh) first):
+There's also a one-liner, if that's more your style. The script is short and
+worth a skim first ([install.sh](install.sh)):
 
 ```sh
 zsh -c "$(curl -fsSL https://raw.githubusercontent.com/pehqge/macconvert/main/install.sh)"
 ```
 
-The installer opens an interactive picker — choose exactly which Quick Actions
-you want. **Only the dependencies for what you pick get installed** (via
-Homebrew, which is the one requirement).
+The installer opens an interactive picker where you choose which Quick
+Actions you want, and it only installs the dependencies for what you picked.
+If you skip everything video-related, ffmpeg never touches your disk.
+Homebrew is the one thing you need beforehand.
 
 <p align="center">
   <img src="assets/demo.gif" alt="macconvert menu: interactive picker for enabling and disabling Quick Actions" width="760">
@@ -43,7 +47,7 @@ Homebrew, which is the one requirement).
 
 ## What you get
 
-| Right-click a… | And convert to |
+| File type | Converts to |
 |---|---|
 | **Image** | PNG · JPG · WebP · HEIC · TIFF · GIF · AVIF · ICO · ICNS · PDF (multi-select combines into one) |
 | **Video** | MP4 (H.264) · MP4 (HEVC, hardware-accelerated) · MOV · WebM · MKV · animated GIF · extract MP3/M4A/WAV · compress |
@@ -52,9 +56,9 @@ Homebrew, which is the one requirement).
 | **Document** | DOCX ⇄ PDF/Markdown/HTML · Markdown ⇄ PDF/DOCX/HTML · HTML ⇄ Markdown/PDF · XLSX → PDF · PPTX → PDF |
 | **Ebook** | EPUB → MOBI/PDF · MOBI → EPUB · **Send to Kindle** |
 
-Only conversions valid for the selected file type appear in the menu.
-Multi-select works — convert a hundred files in one click. Existing files are
-never overwritten (collisions get ` (1)`, ` (2)`… suffixes).
+The menu only shows conversions that make sense for the file you clicked.
+Multi-select works: grab fifty photos, run one action, done. And nothing is
+ever overwritten; if `photo.png` already exists you get `photo (1).png`.
 
 ## Manage it anytime
 
@@ -66,49 +70,53 @@ macconvert update     # update to the latest release
 macconvert uninstall  # remove everything cleanly
 ```
 
-Updates can also run themselves: `macconvert autoupdate on` installs a weekly
-background check.
+Prefer not to think about updates? `macconvert autoupdate on` sets up a
+weekly background check.
 
 ## Send to Kindle
 
-An opt-in Quick Action that emails PDFs, EPUBs and documents straight to your
-Kindle. Setup (`macconvert kindle setup`) walks you through it:
+An opt-in action that emails PDFs, EPUBs and documents straight to your
+Kindle. `macconvert kindle setup` walks you through the three pieces:
 
 1. your `@kindle.com` address,
-2. the email account that sends (Gmail/iCloud/Outlook app password — stored in
-   the **macOS Keychain**, never in a file; existing Calibre settings can be
-   imported in one step),
-3. authorizing the sender on Amazon: [amazon.com/sendtokindle/email](https://www.amazon.com/sendtokindle/email)
+2. the email account that does the sending (Gmail, iCloud or Outlook app
+   password; the password goes in the macOS Keychain, not in a file, and
+   existing Calibre settings import in one step),
+3. authorizing that sender on Amazon: [amazon.com/sendtokindle/email](https://www.amazon.com/sendtokindle/email)
    → **Approved Personal Document E-mail List** → add the sender address.
 
-Then `macconvert kindle test` sends a test document. Delivery uses the
-system's `curl` — no extra dependencies.
+Then `macconvert kindle test` sends a test document to confirm the chain
+works. Delivery goes through the system's `curl`, so there's nothing extra to
+install.
 
 ## How it works
 
 Each action is a real macOS Service: a `.workflow` bundle generated
-programmatically into `~/Library/Services`, scoped to Finder by file-type
-(UTI). The bundles call zsh scripts installed in
-`~/Library/Application Support/MacConvert`, so the cloned repo is disposable
-after install. Failures notify with a pointer to
-`~/Library/Logs/macconvert/<action>.log`; successes stay silent — the new
-file *is* the feedback. Nothing runs with elevated privileges.
+programmatically into `~/Library/Services`, scoped to Finder by file type
+(UTI). The bundles call zsh scripts installed under
+`~/Library/Application Support/MacConvert`, which means you can delete the
+cloned repo after installing and everything keeps working.
+
+Failures notify you and point at `~/Library/Logs/macconvert/<action>.log`
+with the exact tool error. Successes stay silent, because the new file
+showing up next to the original is feedback enough. Nothing runs with
+elevated privileges.
 
 Every conversion is covered by an end-to-end test
-([`tests/verify.sh`](tests/verify.sh)) that invokes the installed bundles
+([`tests/verify.sh`](tests/verify.sh)) that drives the installed bundles
 through the same `automator` path Finder uses.
 
 ## Troubleshooting
 
-- **Actions missing from the menu** — `macconvert doctor`, then restart
-  Finder (`killall Finder`). Still missing? System Settings → Privacy &
-  Security → Extensions → Finder.
-- **A conversion fails** — the notification points at the action's log with
-  the exact tool error.
+- **Actions missing from the menu:** run `macconvert doctor`, then restart
+  Finder with `killall Finder`. Still missing? Check System Settings →
+  Privacy & Security → Extensions → Finder.
+- **A conversion fails:** the notification points at the action's log, which
+  has the exact stderr from the underlying tool.
 
 ## Contributing
 
-Adding a conversion is a script plus one manifest row — see
+A new conversion takes one script and one manifest row. See
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
