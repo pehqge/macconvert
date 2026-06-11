@@ -1,0 +1,8 @@
+# Generated test corpus (tests/generate-samples.sh)
+samples/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log

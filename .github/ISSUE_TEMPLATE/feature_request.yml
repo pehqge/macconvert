@@ -1,0 +1,17 @@
+name: Feature request
+description: Suggest a new conversion or improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      description: >
+        For a new conversion, mention input format → output format and the
+        command-line tool that can do it (if you know one).
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why is it useful?

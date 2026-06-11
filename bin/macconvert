@@ -1,0 +1,339 @@
+#!/bin/zsh
+# macconvert — manage Finder Quick Actions for file conversion.
+#
+#   macconvert                interactive menu
+#   macconvert menu           pick which Quick Actions are enabled
+#   macconvert list           show every action and its status
+#   macconvert enable <id…>   enable actions non-interactively (--all)
+#   macconvert disable <id…>  disable actions non-interactively (--all)
+#   macconvert kindle         Send to Kindle settings (setup | test | status)
+#   macconvert doctor         check dependencies and installation health
+#   macconvert update         update to the latest release (--check)
+#   macconvert autoupdate     on | off — weekly background updates
+#   macconvert uninstall      remove everything
+#   macconvert version        print installed version
+
+set -u
+set -o pipefail
+
+# ${0:A} resolves the symlink (the CLI is linked into Homebrew's bin),
+# landing on <runtime>/bin/macconvert → MC_ROOT=<runtime>.
+MC_ROOT="${0:A:h:h}"
+
+if [[ ! -f "${MC_ROOT}/lib/core.sh" ]]; then
+  print -- "error: runtime not found at ${MC_ROOT} — reinstall with install.sh" >&2
+  exit 1
+fi
+
+source "${MC_ROOT}/lib/core.sh"
+source "${MC_ROOT}/lib/manifest.sh"
+source "${MC_ROOT}/lib/config.sh"
+source "${MC_ROOT}/lib/deps.sh"
+source "${MC_ROOT}/lib/bundle.sh"
+source "${MC_ROOT}/lib/services.sh"
+source "${MC_ROOT}/lib/tui.sh"
+source "${MC_ROOT}/lib/kindle.sh"
+source "${MC_ROOT}/lib/updater.sh"
+
+# --------------------------------------------------------------------------
+# Helpers shared by commands
+# --------------------------------------------------------------------------
+
+# Install dependencies for a set of ids, then apply the set as the enabled set.
+apply_selection() {
+  local -a ids=("$@")
+
+  # Kindle needs configuration the first time it's enabled.
+  if (( ${ids[(I)kindle]} )) && ! mc_kindle_configured; then
+    if [[ -t 0 ]]; then
+      mc_kindle_setup || {
+        mc_warn "Send to Kindle left disabled (setup not completed)"
+        ids=("${(@)ids:#kindle}")
+      }
+    else
+      mc_warn "Send to Kindle needs setup — run: ${MC_CLI_NAME} kindle setup"
+    fi
+  fi
+
+  local -a deps
+  deps=($(mc_deps_for "${ids[@]:-}"))
+  if (( ${#deps[@]} )); then
+    mc_info "Checking dependencies"
+    print -l -- "${deps[@]}" | mc_deps_install || true
+  fi
+
+  mc_info "Applying Quick Actions"
+  mc_services_apply "${ids[@]:-}"
+  print
+  mc_ok "done — right-click a file in Finder → Quick Actions"
+}
+
+cmd_menu() {
+  [[ -t 0 && -t 1 ]] || mc_die "menu needs a terminal — use '${MC_CLI_NAME} enable/disable' in scripts"
+  local preselected
+  preselected="$(mc_services_installed_ids | paste -sd, -)"
+  if mc_tui_select "${MC_APP_NAME} — choose your Quick Actions" "${preselected}"; then
+    apply_selection "${MC_TUI_RESULT[@]:-}"
+  else
+    print -- "cancelled — nothing changed"
+  fi
+}
+
+cmd_list() {
+  local cat id label state
+  for cat in "${MC_CATEGORIES[@]}"; do
+    print -- "${MC_BOLD}${MC_BLUE}${cat}${MC_RESET}"
+    for id in $(mc_actions_in_category "${cat}"); do
+      label="$(mc_action_field "${id}" label)"
+      if mc_service_installed "${id}"; then
+        state="${MC_GREEN}● enabled ${MC_RESET}"
+      else
+        state="${MC_DIM}○ disabled${MC_RESET}"
+      fi
+      printf '  %s  %-24s %s\n' "${state}" "${id}" "${label}"
+    done
+  done
+}
+
+cmd_enable() {
+  local -a ids current
+  current=($(mc_services_installed_ids))
+  if [[ "${1:-}" == "--all" ]]; then
+    ids=($(mc_action_ids))
+  else
+    local id
+    for id in "$@"; do
+      mc_action_row "${id}" >/dev/null || mc_die "unknown action: ${id} (see '${MC_CLI_NAME} list')"
+    done
+    ids=("${current[@]}" "$@")
+  fi
+  apply_selection "${(@u)ids}"
+}
+
+cmd_disable() {
+  local -a current ids
+  if [[ "${1:-}" == "--all" ]]; then
+    ids=()
+  else
+    current=($(mc_services_installed_ids))
+    ids=("${current[@]}")
+    local id
+    for id in "$@"; do
+      ids=("${(@)ids:#${id}}")
+    done
+  fi
+  apply_selection "${ids[@]:-}"
+}
+
+cmd_kindle() {
+  case "${1:-status}" in
+    setup)  mc_kindle_setup ;;
+    test)   mc_kindle_configured || mc_die "not configured — run: ${MC_CLI_NAME} kindle setup"
+            mc_kindle_test ;;
+    status) mc_kindle_status ;;
+    *)      mc_die "usage: ${MC_CLI_NAME} kindle [setup|test|status]" ;;
+  esac
+}
+
+cmd_doctor() {
+  local problems=0
+
+  mc_info "Runtime"
+  [[ -d "${MC_SCRIPTS_DIR}" ]] && mc_ok "runtime installed at ${MC_HOME}" \
+    || { mc_warn "runtime missing — rerun install.sh"; problems=1; }
+  mc_ok "version $(mc_version)"
+
+  mc_info "Homebrew"
+  if [[ -n "${MC_BREW_PREFIX}" ]]; then
+    mc_ok "found at ${MC_BREW_PREFIX}"
+  else
+    mc_warn "Homebrew not found — conversions cannot run"; problems=1
+  fi
+
+  local -a enabled
+  enabled=($(mc_services_installed_ids))
+  mc_info "Quick Actions (${#enabled[@]} enabled)"
+  if (( ${#enabled[@]} )); then
+    local -a deps; deps=($(mc_deps_for "${enabled[@]}"))
+    mc_deps_report "${deps[@]:-}"
+    local dep
+    for dep in "${deps[@]:-}"; do
+      mc_dep_installed "${dep}" || problems=1
+    done
+  else
+    print -- "    none enabled — run: ${MC_CLI_NAME} menu"
+  fi
+
+  mc_info "Send to Kindle"
+  if mc_service_installed kindle; then
+    mc_kindle_configured && mc_ok "configured ($(mc_config_get kindle_email))" \
+      || { mc_warn "enabled but not configured — run: ${MC_CLI_NAME} kindle setup"; problems=1; }
+  else
+    print -- "    not enabled"
+  fi
+
+  mc_info "Auto-update"
+  mc_autoupdate_enabled && mc_ok "on (weekly)" || print -- "    off — enable with: ${MC_CLI_NAME} autoupdate on"
+
+  print
+  if (( problems )); then
+    print -- "${MC_YELLOW}issues found — see warnings above${MC_RESET}"
+    return 1
+  fi
+  print -- "${MC_GREEN}everything looks good${MC_RESET}"
+}
+
+cmd_uninstall() {
+  print -- "This removes every ${MC_APP_NAME} Quick Action, the runtime at"
+  print -- "${MC_HOME}, and the CLI."
+  mc_confirm "Continue?" n || { print -- "aborted"; return 1; }
+
+  mc_info "Removing Quick Actions"
+  local id
+  for id in $(mc_services_installed_ids); do
+    mc_service_remove "${id}"
+    print -- "    ${MC_DIM}✗ $(mc_action_field "${id}" label)${MC_RESET}"
+  done
+  mc_services_refresh
+
+  mc_autoupdate_enabled && mc_autoupdate_off
+
+  if mc_confirm "Also remove settings and the Keychain entry?" n; then
+    rm -rf "${MC_CONFIG_DIR}"
+    mc_kindle_password_delete
+    mc_ok "settings removed"
+  fi
+
+  mc_info "Removing runtime"
+  [[ -n "${MC_BREW_PREFIX}" ]] && rm -f "${MC_BREW_PREFIX}/bin/${MC_CLI_NAME}"
+  rm -rf "${MC_HOME}"
+  mc_ok "uninstalled — thanks for trying ${MC_APP_NAME}"
+}
+
+cmd_home() {
+  [[ -t 0 && -t 1 ]] || { cmd_help; return 0; }
+  local enabled_count choice
+  while true; do
+    enabled_count=$(mc_services_installed_ids | grep -c . || true)
+    choice="$(mc_tui_choose "${MC_APP_NAME} $(mc_version) — ${enabled_count}/${#MC_ACTIONS[@]} Quick Actions enabled" \
+      "Manage Quick Actions" \
+      "Send to Kindle settings" \
+      "Check for updates" \
+      "Doctor (health check)" \
+      "Uninstall" \
+      "Quit")" || return 0
+    case "${choice}" in
+      1) cmd_menu ;;
+      2) mc_kindle_status
+         if mc_confirm "Edit Send to Kindle settings?" n; then mc_kindle_setup; fi ;;
+      3) mc_update ;;
+      4) cmd_doctor || true ;;
+      5) cmd_uninstall && return 0 ;;
+      6) return 0 ;;
+    esac
+    print
+    read -srk1 "?$(print -- "${MC_DIM}press any key to return to the menu…${MC_RESET}")"
+  done
+}
+
+# First-run flow, launched by install.sh: pick actions (everything
+# preselected), then offer auto-update.
+cmd_setup() {
+  if [[ ! -t 0 || ! -t 1 ]]; then
+    mc_warn "no terminal — enabling every Quick Action (customize later with '${MC_CLI_NAME} menu')"
+    cmd_enable --all
+    return
+  fi
+
+  print
+  print -- "  ${MC_BOLD}Welcome to ${MC_APP_NAME}.${MC_RESET}"
+  print -- "  Pick the Quick Actions you want in Finder's right-click menu."
+  print -- "  Only the dependencies for what you pick get installed."
+  print -- "  ${MC_DIM}You can change this anytime with '${MC_CLI_NAME} menu'.${MC_RESET}"
+  print
+  read -srk1 "?  press any key to choose…"
+
+  local preselected
+  if mc_services_installed_ids | grep -q .; then
+    preselected="$(mc_services_installed_ids | paste -sd, -)"   # reinstall: keep choices
+  else
+    preselected="$(mc_action_ids | grep -v '^kindle$' | paste -sd, -)"  # first run: all but Kindle
+  fi
+
+  if mc_tui_select "${MC_APP_NAME} — choose your Quick Actions" "${preselected}"; then
+    apply_selection "${MC_TUI_RESULT[@]:-}"
+  else
+    print -- "cancelled — enable actions later with: ${MC_CLI_NAME} menu"
+    return 0
+  fi
+
+  print
+  if ! mc_autoupdate_enabled && mc_confirm "Enable weekly auto-updates?" y; then
+    mc_autoupdate_on
+  fi
+
+  print
+  print -- "  ${MC_GREEN}${MC_BOLD}All set.${MC_RESET} Right-click any file in Finder → ${MC_BOLD}Quick Actions${MC_RESET}."
+  print -- "  ${MC_DIM}Manage everything later with: ${MC_CLI_NAME}${MC_RESET}"
+}
+
+# Internal: called by install.sh --update after the runtime was refreshed.
+cmd_rerender() {
+  mc_info "Refreshing installed Quick Actions"
+  mc_services_rerender
+  mc_ok "updated to $(mc_version)"
+}
+
+cmd_help() {
+  cat <<EOF
+${MC_BOLD}${MC_CLI_NAME}${MC_RESET} — Finder Quick Actions for file conversion
+
+${MC_BOLD}usage:${MC_RESET} ${MC_CLI_NAME} [command]
+
+  ${MC_BOLD}(no command)${MC_RESET}      interactive menu
+  ${MC_BOLD}menu${MC_RESET}              pick which Quick Actions are enabled
+  ${MC_BOLD}list${MC_RESET}              show every action and its status
+  ${MC_BOLD}enable${MC_RESET} <id…>      enable actions (or --all)
+  ${MC_BOLD}disable${MC_RESET} <id…>     disable actions (or --all)
+  ${MC_BOLD}kindle${MC_RESET}            Send to Kindle settings (setup | test | status)
+  ${MC_BOLD}doctor${MC_RESET}            check dependencies and installation health
+  ${MC_BOLD}update${MC_RESET}            update to the latest release (--check)
+  ${MC_BOLD}autoupdate${MC_RESET} on|off weekly background updates
+  ${MC_BOLD}uninstall${MC_RESET}         remove everything
+  ${MC_BOLD}version${MC_RESET}           print installed version
+
+docs: https://github.com/${MC_REPO}
+EOF
+}
+
+# ---------------------------------------------------------------------------
+# Dispatch
+# ---------------------------------------------------------------------------
+
+main() {
+  local cmd="${1:-}"
+  (( $# )) && shift
+  case "${cmd}" in
+    "")              cmd_home "$@" ;;
+    setup)           cmd_setup "$@" ;;
+    __rerender)      cmd_rerender "$@" ;;
+    menu)            cmd_menu "$@" ;;
+    list)            cmd_list "$@" ;;
+    enable)          (( $# )) || mc_die "usage: ${MC_CLI_NAME} enable <id…|--all>"; cmd_enable "$@" ;;
+    disable)         (( $# )) || mc_die "usage: ${MC_CLI_NAME} disable <id…|--all>"; cmd_disable "$@" ;;
+    kindle)          cmd_kindle "$@" ;;
+    doctor)          cmd_doctor "$@" ;;
+    update)          mc_update "$@" ;;
+    autoupdate)      case "${1:-}" in
+                       on)  mc_autoupdate_on ;;
+                       off) mc_autoupdate_off ;;
+                       *)   mc_die "usage: ${MC_CLI_NAME} autoupdate <on|off>" ;;
+                     esac ;;
+    uninstall)       cmd_uninstall "$@" ;;
+    version|--version|-v) print -- "$(mc_version)" ;;
+    help|--help|-h)  cmd_help ;;
+    *)               mc_error "unknown command: ${cmd}"; cmd_help; exit 1 ;;
+  esac
+}
+
+main "$@"

@@ -1,0 +1,38 @@
+name: Bug report
+description: A Quick Action fails, is missing from the menu, or behaves wrong
+labels: [bug]
+body:
+  - type: input
+    id: action
+    attributes:
+      label: Which Quick Action?
+      placeholder: e.g. Convert to WebP
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Action log
+      description: >
+        Paste the tail of `~/Library/Logs/macconvert/<action>.log` —
+        it contains the exact tool error.
+      render: text
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `macconvert doctor`
+      render: text
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and chip
+      placeholder: e.g. macOS 15.5, Apple M2
+    validations:
+      required: true

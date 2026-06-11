@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Unit tests (macOS)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run unit suite
+        run: zsh tests/unit.sh
+
+  shellcheck:
+    # The runtime is zsh (shellcheck can't parse it), but it still catches
+    # real bugs in the POSIX-compatible parts when run advisory-only with
+    # bash dialect. zsh correctness is covered by tests/unit.sh.
+    name: ShellCheck (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ludeeus/action-shellcheck@2.0.0
+        env:
+          SHELLCHECK_OPTS: --shell=bash --severity=error

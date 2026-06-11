@@ -1,0 +1,18 @@
+#!/bin/zsh
+ACTION_NAME="convert-epub-to-pdf"
+source "$(dirname "$0")/_common.sh"
+
+process_file() {
+  local input="$1"
+  local dir; dir="$(dirname "${input}")"
+  local base; base="$(basename "${input}")"; base="$(strip_ext "${base}")"
+  local out; out="$(unique_output_path "${dir}" "${base}" "pdf")"
+  require_tool "${EBOOK_CONVERT}" "calibre" || return 1
+  if ! "${EBOOK_CONVERT}" "${input}" "${out}" >>"${LOG_FILE}" 2>&1; then
+    return 1
+  fi
+  LAST_OUTPUT_BASENAME="$(basename "${out}")"
+  log "OK -> ${out}"
+}
+
+run_batch "$@"
