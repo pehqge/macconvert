@@ -50,6 +50,14 @@ mc_update() {
     return 0
   fi
 
+  # Homebrew-managed installs update through brew so the two stay in sync;
+  # the bootstrap then refreshes the Application Support copy on re-exec.
+  if [[ "$(mc_config_get install_method 2>/dev/null)" == "brew" ]]; then
+    (( quiet )) || mc_info "Updating via Homebrew (${current} → ${latest})"
+    mc_brew upgrade "${MC_TAP_FORMULA}" || return 1
+    exec "${MC_BREW_PREFIX}/bin/${MC_CLI_NAME}" __rerender
+  fi
+
   (( quiet )) || mc_info "Updating ${current} → ${latest}"
   local tmp; tmp="$(mktemp -d -t macconvert-update)"
   {
