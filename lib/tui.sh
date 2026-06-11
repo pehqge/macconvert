@@ -47,6 +47,10 @@ mc_tui_key() {
   fi
 }
 
+# Erase to end of line. Appending this to every redrawn line (instead of
+# clearing the whole screen first) is what keeps the menu flicker-free.
+readonly MC_TUI_EL=$'\e[K'
+
 # --- multi-select -----------------------------------------------------------
 
 # mc_tui_select <title> <preselected-ids-csv>
@@ -54,16 +58,21 @@ mc_tui_key() {
 # Rows come from the manifest, grouped under category headers. Space on an
 # item toggles it; space on a header toggles the whole category. Result is
 # returned in the global array MC_TUI_RESULT; returns 1 when cancelled.
+#
+# The Kindle category is intentionally absent: Send to Kindle needs its own
+# configuration flow, handled by `macconvert kindle` and the setup wizard.
 mc_tui_select() {
   local title="$1" preselected="$2"
 
   # rows: "header:<category>" or "item:<id>"
   local -a rows
-  local cat id
+  local cat id items_total=0
   for cat in "${MC_CATEGORIES[@]}"; do
+    [[ "${cat}" == "Kindle" ]] && continue
     rows+=("header:${cat}")
     for id in $(mc_actions_in_category "${cat}"); do
       rows+=("item:${id}")
+      items_total=$((items_total + 1))
     done
   done
 
@@ -108,6 +117,16 @@ mc_tui_select() {
     fi
   }
 
+  _select_all() {
+    local r
+    for r in "${rows[@]}"; do
+      [[ "${r}" == item:* ]] && sel[${r#item:}]=1
+    done
+  }
+
+  # Flicker-free redraw: move the cursor home and overwrite each line in
+  # place, erasing only to end-of-line. The screen is never cleared as a
+  # whole, so nothing blinks while navigating.
   _draw() {
     local lines=${LINES:-$(tput lines)} cols=${COLUMNS:-$(tput cols)}
     local height=$((lines - 5))                  # rows visible in the viewport
@@ -118,9 +137,8 @@ mc_tui_select() {
     (( top < 1 )) && top=1
 
     tput cup 0 0 2>/dev/null
-    tput ed 2>/dev/null                           # clear to end of screen
-    print -- "  ${MC_BOLD}${title}${MC_RESET}"
-    print
+    print -- "  ${MC_BOLD}${title}${MC_RESET}${MC_TUI_EL}"
+    print -- "${MC_TUI_EL}"
 
     local idx row marker label pointer c
     local -a counts
@@ -131,7 +149,7 @@ mc_tui_select() {
       if [[ "${row}" == header:* ]]; then
         c="${row#header:}"
         counts=( $(_cat_counts "${c}") )
-        print -- "${pointer}${MC_BOLD}${MC_BLUE}${c}${MC_RESET} ${MC_DIM}(${counts[1]}/${counts[2]})${MC_RESET}"
+        print -- "${pointer}${MC_BOLD}${MC_BLUE}${c}${MC_RESET} ${MC_DIM}(${counts[1]}/${counts[2]})${MC_RESET}${MC_TUI_EL}"
       else
         id="${row#item:}"
         label="$(mc_action_field "${id}" label)"
@@ -140,14 +158,15 @@ mc_tui_select() {
         else
           marker="${MC_DIM}○${MC_RESET}"
         fi
-        print -- "${pointer}  ${marker} ${label}"
+        print -- "${pointer}  ${marker} ${label}${MC_TUI_EL}"
       fi
     done
 
-    print
+    print -- "${MC_TUI_EL}"
     # Keep the footer narrower than the terminal — a wrapped line would
     # scroll the whole alternate screen and shift the layout.
-    print -n -- "  ${MC_DIM}↑↓ move · space toggle · a all · n none · ⏎ apply · q quit${MC_RESET} ${MC_BOLD}$(_selected_count)/${#MC_ACTIONS[@]}${MC_RESET}"
+    print -n -- "  ${MC_DIM}↑↓ move · space toggle · a all · n none · ⏎ apply · q quit${MC_RESET} ${MC_BOLD}$(_selected_count)/${items_total}${MC_RESET}${MC_TUI_EL}"
+    tput ed 2>/dev/null   # wipe anything left over below (normally a no-op)
   }
 
   mc_tui_enter
@@ -157,7 +176,7 @@ mc_tui_select() {
       up|k)   (( cursor > 1 )) && cursor=$((cursor - 1)) ;;
       down|j) (( cursor < total )) && cursor=$((cursor + 1)) ;;
       space)  _toggle_row ;;
-      a)      for id in $(mc_action_ids); do sel[${id}]=1; done ;;
+      a)      _select_all ;;
       n)      sel=() ;;
       enter)
         mc_tui_leave
@@ -186,19 +205,19 @@ mc_tui_choose() {
 
   _draw_choose() {
     tput cup 0 0 2>/dev/null
-    tput ed 2>/dev/null
-    print -- "  ${MC_BOLD}${title}${MC_RESET}"
-    print
+    print -- "  ${MC_BOLD}${title}${MC_RESET}${MC_TUI_EL}"
+    print -- "${MC_TUI_EL}"
     local i
     for (( i = 1; i <= total; i++ )); do
       if (( i == cursor )); then
-        print -- "  ${MC_CYAN}❯ ${options[${i}]}${MC_RESET}"
+        print -- "  ${MC_CYAN}❯ ${options[${i}]}${MC_RESET}${MC_TUI_EL}"
       else
-        print -- "    ${options[${i}]}"
+        print -- "    ${options[${i}]}${MC_TUI_EL}"
       fi
     done
-    print
-    print -- "  ${MC_DIM}↑/↓ move · enter select · q quit${MC_RESET}"
+    print -- "${MC_TUI_EL}"
+    print -n -- "  ${MC_DIM}↑/↓ move · enter select · q quit${MC_RESET}${MC_TUI_EL}"
+    tput ed 2>/dev/null
   }
 
   mc_tui_enter

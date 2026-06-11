@@ -79,7 +79,8 @@ install_runtime() {
   done
   cp -f "${src}/VERSION" "${RUNTIME_DIR}/VERSION"
   mkdir -p "${RUNTIME_DIR}/resources"
-  cp -f "${src}/resources/icon.icns" "${RUNTIME_DIR}/resources/icon.icns" 2>/dev/null
+  cp -f "${src}/resources/icon.icns" "${src}/resources/icon-menu.png" \
+    "${RUNTIME_DIR}/resources/" 2>/dev/null
 
   chmod +x "${RUNTIME_DIR}/bin/${CLI_NAME}" "${RUNTIME_DIR}"/scripts/*.sh
   ok "runtime $(cat "${RUNTIME_DIR}/VERSION") installed"

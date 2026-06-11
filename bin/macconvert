@@ -63,7 +63,8 @@ mc_bootstrap() {
     done
     cp -f "${MC_ROOT}/VERSION" "${MC_HOME}/VERSION"
     mkdir -p "${MC_HOME}/resources"
-    cp -f "${MC_ROOT}/resources/icon.icns" "${MC_HOME}/resources/icon.icns" 2>/dev/null
+    cp -f "${MC_ROOT}/resources/icon.icns" "${MC_ROOT}/resources/icon-menu.png" \
+      "${MC_HOME}/resources/" 2>/dev/null
     chmod +x "${MC_HOME}/bin/${MC_CLI_NAME}" "${MC_HOME}"/scripts/*.sh
   fi
 
@@ -108,12 +109,20 @@ apply_selection() {
   mc_ok "done — right-click a file in Finder → Quick Actions"
 }
 
+# The picker covers conversions only; Send to Kindle keeps whatever state it
+# has (it's managed by '${MC_CLI_NAME} kindle' and the setup wizard).
+with_kindle_state() {
+  local -a ids=("$@")
+  mc_service_installed kindle && ids+=(kindle)
+  print -l -- "${ids[@]:-}"
+}
+
 cmd_menu() {
   [[ -t 0 && -t 1 ]] || mc_die "menu needs a terminal — use '${MC_CLI_NAME} enable/disable' in scripts"
   local preselected
   preselected="$(mc_services_installed_ids | paste -sd, -)"
   if mc_tui_select "${MC_APP_NAME} — choose your Quick Actions" "${preselected}"; then
-    apply_selection "${MC_TUI_RESULT[@]:-}"
+    apply_selection $(with_kindle_state "${MC_TUI_RESULT[@]:-}")
   else
     print -- "cancelled — nothing changed"
   fi
@@ -165,13 +174,57 @@ cmd_disable() {
   apply_selection "${ids[@]:-}"
 }
 
+# Dedicated setup page for Send to Kindle, shown right after the picker.
+setup_kindle_step() {
+  print
+  mc_info "Send to Kindle (optional)"
+  print -- "    Adds a right-click action that emails books and documents"
+  print -- "    straight to your Kindle. Works with:"
+  print -- "    ${MC_BOLD}PDF · EPUB · DOC/DOCX · TXT · RTF · HTML${MC_RESET}"
+  print
+
+  if mc_service_installed kindle && mc_kindle_configured; then
+    mc_ok "already enabled ($(mc_config_get kindle_email))"
+    return 0
+  fi
+
+  if ! mc_confirm "    Enable Send to Kindle?" y; then
+    print -- "    ${MC_DIM}skipped — enable later with: ${MC_CLI_NAME} kindle on${MC_RESET}"
+    return 0
+  fi
+
+  if ! mc_kindle_configured; then
+    mc_kindle_setup || {
+      mc_warn "left disabled — rerun anytime with: ${MC_CLI_NAME} kindle on"
+      return 0
+    }
+  fi
+  mc_service_install kindle && mc_services_refresh
+  mc_ok "Send to Kindle enabled"
+}
+
 cmd_kindle() {
   case "${1:-status}" in
     setup)  mc_kindle_setup ;;
+    on)     if ! mc_kindle_configured; then
+              mc_kindle_setup || return 1
+            fi
+            mc_service_install kindle && mc_services_refresh
+            mc_ok "Send to Kindle enabled" ;;
+    off)    mc_service_remove kindle
+            mc_services_refresh
+            mc_ok "Send to Kindle disabled" ;;
     test)   mc_kindle_configured || mc_die "not configured — run: ${MC_CLI_NAME} kindle setup"
             mc_kindle_test ;;
+    verify) mc_kindle_configured || mc_die "not configured — run: ${MC_CLI_NAME} kindle setup"
+            if mc_kindle_verify_smtp; then
+              mc_ok "SMTP login works (nothing was sent)"
+            else
+              mc_error "SMTP login failed — see '${MC_CLI_NAME} kindle status'"
+              return 1
+            fi ;;
     status) mc_kindle_status ;;
-    *)      mc_die "usage: ${MC_CLI_NAME} kindle [setup|test|status]" ;;
+    *)      mc_die "usage: ${MC_CLI_NAME} kindle [setup|on|off|verify|test|status]" ;;
   esac
 }
 
@@ -224,8 +277,14 @@ cmd_doctor() {
 }
 
 cmd_uninstall() {
+  # Read this before the config file is (optionally) deleted below.
+  local install_method
+  install_method="$(mc_config_get install_method 2>/dev/null)"
+
   print -- "This removes every ${MC_APP_NAME} Quick Action, the runtime at"
   print -- "${MC_HOME}, and the CLI."
+  [[ "${install_method}" == "brew" ]] \
+    && print -- "The Homebrew package will be uninstalled too."
   mc_confirm "Continue?" n || { print -- "aborted"; return 1; }
 
   mc_info "Removing Quick Actions"
@@ -245,8 +304,15 @@ cmd_uninstall() {
   fi
 
   mc_info "Removing runtime"
-  [[ -n "${MC_BREW_PREFIX}" ]] && rm -f "${MC_BREW_PREFIX}/bin/${MC_CLI_NAME}"
   rm -rf "${MC_HOME}"
+  if [[ "${install_method}" == "brew" ]]; then
+    mc_info "Removing the Homebrew package"
+    mc_brew uninstall --quiet "${MC_TAP_FORMULA}" 2>/dev/null \
+      || mc_brew uninstall --quiet "${MC_CLI_NAME}" \
+      || mc_warn "run manually: brew uninstall ${MC_TAP_FORMULA}"
+  else
+    [[ -n "${MC_BREW_PREFIX}" ]] && rm -f "${MC_BREW_PREFIX}/bin/${MC_CLI_NAME}"
+  fi
   mc_ok "uninstalled — thanks for trying ${MC_APP_NAME}"
 }
 
@@ -270,7 +336,12 @@ cmd_home() {
     case "${choice}" in
       1) cmd_menu ;;
       2) mc_kindle_status
-         if mc_confirm "Edit Send to Kindle settings?" n; then mc_kindle_setup; fi ;;
+         if mc_service_installed kindle; then
+           if mc_confirm "Edit settings?" n; then mc_kindle_setup; fi
+           if mc_confirm "Disable Send to Kindle?" n; then cmd_kindle off; fi
+         else
+           if mc_confirm "Enable Send to Kindle?" y; then cmd_kindle on; fi
+         fi ;;
       3) mc_update ;;
       4) cmd_doctor || true ;;
       5) cmd_uninstall && return 0 ;;
@@ -306,11 +377,13 @@ cmd_setup() {
   fi
 
   if mc_tui_select "${MC_APP_NAME} — choose your Quick Actions" "${preselected}"; then
-    apply_selection "${MC_TUI_RESULT[@]:-}"
+    apply_selection $(with_kindle_state "${MC_TUI_RESULT[@]:-}")
   else
     print -- "cancelled — enable actions later with: ${MC_CLI_NAME} menu"
     return 0
   fi
+
+  setup_kindle_step
 
   print
   if ! mc_autoupdate_enabled && mc_confirm "Enable weekly auto-updates?" y; then
@@ -340,7 +413,7 @@ ${MC_BOLD}usage:${MC_RESET} ${MC_CLI_NAME} [command]
   ${MC_BOLD}list${MC_RESET}              show every action and its status
   ${MC_BOLD}enable${MC_RESET} <id…>      enable actions (or --all)
   ${MC_BOLD}disable${MC_RESET} <id…>     disable actions (or --all)
-  ${MC_BOLD}kindle${MC_RESET}            Send to Kindle settings (setup | test | status)
+  ${MC_BOLD}kindle${MC_RESET}            Send to Kindle (setup | on | off | verify | test | status)
   ${MC_BOLD}doctor${MC_RESET}            check dependencies and installation health
   ${MC_BOLD}update${MC_RESET}            update to the latest release (--check)
   ${MC_BOLD}autoupdate${MC_RESET} on|off weekly background updates

@@ -6,11 +6,11 @@
 #                             the menu label, and the Finder-only context.
 #   Contents/document.wflow — an Automator document with a single
 #                             "Run Shell Script" action that execs our script.
-
-# Slug used for CFBundleIdentifier; must stay in sync with mc_services_enable.
-mc_bundle_slug() {
-  print -r -- "$1" | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//'
-}
+#
+# Both plists mirror what Automator itself writes when saving a Quick Action.
+# That fidelity matters: bundles with a CFBundleIdentifier or without
+# NSIconName/NSBackgroundColorName get filed under the legacy "Services"
+# submenu instead of "Quick Actions" in Finder's right-click menu.
 
 # mc_bundle_write <bundle-name> <utis-csv> <script-path> <dest-dir> <menu-label>
 #
@@ -22,17 +22,22 @@ mc_bundle_write() {
 
   local workflow_dir="${dest_dir}/${name}.workflow"
   local contents_dir="${workflow_dir}/Contents"
-  local resources_dir="${contents_dir}/Resources"
 
   # Idempotent: blow away any prior version, then recreate.
   rm -rf "${workflow_dir}"
-  mkdir -p "${contents_dir}" "${resources_dir}"
+  mkdir -p "${contents_dir}"
 
-  local icon_entry=""
-  if [[ -f "${MC_RESOURCES_DIR}/icon.icns" ]]; then
-    cp "${MC_RESOURCES_DIR}/icon.icns" "${resources_dir}/icon.icns"
-    icon_entry="    <key>CFBundleIconFile</key>
-    <string>icon</string>
+  # The menu icon travels inside document.wflow as base64 image data, exactly
+  # like Automator's "custom image" option.
+  local icon_data="" icon_xml=""
+  if [[ -f "${MC_RESOURCES_DIR}/icon-menu.png" ]]; then
+    icon_data="$(/usr/bin/base64 -b 52 -i "${MC_RESOURCES_DIR}/icon-menu.png")"
+    icon_xml="    <key>customImageFileData</key>
+    <data>
+${icon_data}
+    </data>
+    <key>customImageFileExtension</key>
+    <string>png</string>
 "
   fi
 
@@ -41,24 +46,18 @@ mc_bundle_write() {
     send_types_xml+="                <string>${u}</string>"$'\n'
   done
 
-  local bundle_id="${MC_BUNDLE_PREFIX}.$(mc_bundle_slug "${name}")"
-
   cat > "${contents_dir}/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleDevelopmentRegion</key>
-    <string>en_US</string>
-    <key>CFBundleIdentifier</key>
-    <string>${bundle_id}</string>
-    <key>CFBundleName</key>
-    <string>${display_name}</string>
-${icon_entry}    <key>CFBundleShortVersionString</key>
-    <string>$(mc_version)</string>
     <key>NSServices</key>
     <array>
         <dict>
+            <key>NSBackgroundColorName</key>
+            <string>background</string>
+            <key>NSIconName</key>
+            <string>workflowCustomImageTemplate</string>
             <key>NSMenuItem</key>
             <dict>
                 <key>default</key>
@@ -204,18 +203,29 @@ EOF
     <dict/>
     <key>workflowMetaData</key>
     <dict>
+        <key>applicationBundleID</key>
+        <string>com.apple.finder</string>
         <key>applicationBundleIDsByPath</key>
-        <dict/>
+        <dict>
+            <key>/System/Library/CoreServices/Finder.app</key>
+            <string>com.apple.finder</string>
+        </dict>
+        <key>applicationPath</key>
+        <string>/System/Library/CoreServices/Finder.app</string>
         <key>applicationPaths</key>
-        <array/>
-        <key>inputTypeIdentifier</key>
+        <array>
+            <string>/System/Library/CoreServices/Finder.app</string>
+        </array>
+        <key>backgroundColorName</key>
+        <string>background</string>
+${icon_xml}        <key>inputTypeIdentifier</key>
         <string>com.apple.Automator.fileSystemObject</string>
         <key>outputTypeIdentifier</key>
         <string>com.apple.Automator.nothing</string>
         <key>presentationMode</key>
         <integer>15</integer>
         <key>processesInput</key>
-        <integer>0</integer>
+        <false/>
         <key>serviceApplicationBundleID</key>
         <string>com.apple.finder</string>
         <key>serviceApplicationPath</key>
@@ -225,11 +235,9 @@ EOF
         <key>serviceOutputTypeIdentifier</key>
         <string>com.apple.Automator.nothing</string>
         <key>serviceProcessesInput</key>
-        <integer>0</integer>
-        <key>systemImageName</key>
-        <string>NSActionTemplate</string>
+        <false/>
         <key>useAutomaticInputType</key>
-        <integer>0</integer>
+        <false/>
         <key>workflowTypeIdentifier</key>
         <string>com.apple.Automator.servicesMenu</string>
     </dict>

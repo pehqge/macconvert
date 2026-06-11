@@ -109,11 +109,38 @@ mc_kindle_setup() {
 
   mc_kindle_show_amazon_steps "$(mc_config_get smtp_from)"
 
-  # 3. Optional test ----------------------------------------------------------
-  if mc_confirm "    Send a test document to ${kindle_email} now?" n; then
-    mc_kindle_test
+  # 3. Verify the SMTP login (nothing is sent to the Kindle) -------------------
+  mc_info "Checking the SMTP connection (no document is sent)…"
+  if mc_kindle_verify_smtp; then
+    mc_ok "connected and logged in — Send to Kindle is ready"
+  else
+    mc_warn "could not log in to $(mc_config_get smtp_host)"
+    mc_warn "double-check the app password, then rerun: ${MC_CLI_NAME} kindle setup"
+    return 1
   fi
   return 0
+}
+
+# Connects to the relay and authenticates, without sending anything.
+# curl's SMTP "GET" performs EHLO → STARTTLS → AUTH → HELP and disconnects;
+# exit 0 means the login works, 67 means it was denied.
+mc_kindle_verify_smtp() {
+  local host port user password url
+  host="$(mc_config_get smtp_host)" || return 1
+  port="$(mc_config_get smtp_port)"; port="${port:-587}"
+  user="$(mc_config_get smtp_user)"
+  user="${user:-$(mc_config_get smtp_from)}"
+  password="$(/usr/bin/security find-generic-password \
+    -s "${MC_KEYCHAIN_SERVICE}" -a "${MC_KEYCHAIN_ACCOUNT}" -w 2>/dev/null)" || return 1
+
+  if [[ "${port}" == "465" ]]; then
+    url="smtps://${host}:${port}/"
+  else
+    url="smtp://${host}:${port}/"
+  fi
+
+  print -r -- "user = \"${user//\"/\\\"}:${password//\"/\\\"}\"" | /usr/bin/curl \
+    --silent --config - --ssl-reqd --url "${url}" --max-time 30 -o /dev/null 2>/dev/null
 }
 
 mc_kindle_setup_smtp() {
@@ -174,9 +201,14 @@ mc_kindle_test() {
   rm -f "${tmp}"
 }
 
-# Settings summary + edit menu for `macconvert kindle`.
+# Settings summary for `macconvert kindle`.
 mc_kindle_status() {
   print
+  if mc_service_installed kindle; then
+    print -- "    Quick Action   : ${MC_GREEN}enabled${MC_RESET}"
+  else
+    print -- "    Quick Action   : ${MC_DIM}disabled${MC_RESET} (enable with: ${MC_CLI_NAME} kindle on)"
+  fi
   if mc_kindle_configured; then
     print -- "    Kindle address : $(mc_config_get kindle_email)"
     print -- "    Sender         : $(mc_config_get smtp_from)"

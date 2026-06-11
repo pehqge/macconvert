@@ -45,13 +45,13 @@ mc_service_remove() {
 }
 
 # Flip the pbs (Services pasteboard) switches so the action shows up in the
-# right-click menu immediately, without a trip to System Settings. pbs's
-# per-service key is "<bundle-id> - <menu-label> - runWorkflowAsService".
+# right-click menu immediately, without a trip to System Settings. Workflow
+# bundles have no CFBundleIdentifier (on purpose — see bundle.sh), so pbs
+# keys them as "(null) - <menu-label> - runWorkflowAsService".
 mc_service_enable() {
   local id="$1"
   local label; label="$(mc_action_field "${id}" label)"
-  local bundle_id="${MC_BUNDLE_PREFIX}.$(mc_bundle_slug "${MC_WORKFLOW_PREFIX}${label}")"
-  local key="${bundle_id} - ${label} - runWorkflowAsService"
+  local key="(null) - ${label} - runWorkflowAsService"
   local plist="${HOME}/Library/Preferences/pbs.plist"
   local pb=/usr/libexec/PlistBuddy
 
@@ -67,8 +67,33 @@ mc_service_enable() {
   return 0
 }
 
+# Drop pbs entries from pre-1.2 versions, which keyed services by a
+# com.macconvert.* bundle id (that keying also pushed them into the legacy
+# "Services" submenu).
+mc_services_clean_legacy_pbs() {
+  /usr/bin/python3 - <<'PY' 2>/dev/null || true
+import os, plistlib
+p = os.path.expanduser("~/Library/Preferences/pbs.plist")
+try:
+    with open(p, "rb") as f:
+        d = plistlib.load(f)
+except Exception:
+    raise SystemExit
+s = d.get("NSServicesStatus", {})
+stale = [k for k in s
+         if k.startswith("com.macconvert.")
+         or k.startswith("(null) - MacConvert - ")]
+for k in stale:
+    del s[k]
+if stale:
+    with open(p, "wb") as f:
+        plistlib.dump(d, f)
+PY
+}
+
 # Make macOS notice what changed: reload prefs, re-scan Services, poke Finder.
 mc_services_refresh() {
+  mc_services_clean_legacy_pbs
   killall cfprefsd 2>/dev/null || true
   /System/Library/CoreServices/pbs -update >/dev/null 2>&1 || true
   sleep 1

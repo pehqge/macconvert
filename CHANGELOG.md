@@ -4,6 +4,28 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-06-11
+
+### Fixed
+
+- Actions now appear under Finder's **Quick Actions** submenu instead of the
+  legacy Services submenu. The generated bundles mirror Automator's own
+  output exactly (no CFBundleIdentifier, NSIconName/NSBackgroundColorName
+  present), which is what macOS uses to classify them.
+- The interactive picker no longer flickers while navigating: redraws
+  overwrite lines in place instead of clearing the screen.
+
+### Changed
+
+- Menu icon is a proper template glyph (conversion arrows), rendered
+  correctly in light and dark menus.
+- Send to Kindle left the action picker and became a dedicated setup step:
+  it lists the supported formats, asks to enable (default yes), and verifies
+  the SMTP login without sending anything to the Kindle. New subcommands:
+  `macconvert kindle on | off | verify`.
+- `macconvert uninstall` now removes everything on Homebrew installs too,
+  including the brew package itself.
+
 ## [1.1.1] - 2026-06-10
 
 ### Changed
@@ -41,6 +63,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   through the same `automator` path Finder uses, including multi-select,
   filename edge cases and collision suffixing.
 
+[1.2.0]: https://github.com/pehqge/macconvert/releases/tag/v1.2.0
 [1.1.1]: https://github.com/pehqge/macconvert/releases/tag/v1.1.1
 [1.1.0]: https://github.com/pehqge/macconvert/releases/tag/v1.1.0
 [1.0.0]: https://github.com/pehqge/macconvert/releases/tag/v1.0.0
