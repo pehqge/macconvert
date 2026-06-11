@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-06-10
+
+### Added
+
+- Homebrew tap install: `brew install pehqge/tap/macconvert`. The CLI now
+  bootstraps its runtime into Application Support on first run, from wherever
+  it's launched (brew libexec or a git checkout), and `macconvert update`
+  delegates to `brew upgrade` on brew-managed installs so the two never drift.
+
 ## [1.0.0] - 2026-06-10
 
 ### Added
@@ -25,4 +34,5 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   through the same `automator` path Finder uses, including multi-select,
   filename edge cases and collision suffixing.
 
+[1.1.0]: https://github.com/pehqge/macconvert/releases/tag/v1.1.0
 [1.0.0]: https://github.com/pehqge/macconvert/releases/tag/v1.0.0

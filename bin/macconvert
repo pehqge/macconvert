@@ -36,6 +36,46 @@ source "${MC_ROOT}/lib/kindle.sh"
 source "${MC_ROOT}/lib/updater.sh"
 
 # --------------------------------------------------------------------------
+# Self-bootstrap
+#
+# The workflow bundles point at scripts in MC_HOME (Application Support), so
+# when this CLI runs from anywhere else — a Homebrew libexec, a git checkout —
+# it first syncs the runtime there and re-execs the installed copy. Set
+# MACCONVERT_DEV=1 to skip this and run a checkout in place.
+# --------------------------------------------------------------------------
+
+mc_bootstrap() {
+  [[ "${MC_ROOT}" == "${MC_HOME}" || -n "${MACCONVERT_DEV:-}" ]] && return 0
+  case "${1:-}" in
+    version|--version|-v|help|--help|-h) return 0 ;;   # no runtime needed
+  esac
+
+  local src_version dst_version
+  src_version="$(cat "${MC_ROOT}/VERSION" 2>/dev/null)"
+  dst_version="$(cat "${MC_HOME}/VERSION" 2>/dev/null)"
+  if [[ ! -x "${MC_HOME}/bin/${MC_CLI_NAME}" ]] \
+     || [[ "$(mc_update_compare "${dst_version:-0.0.0}" "v${src_version:-0.0.0}")" == "newer" ]]; then
+    mkdir -p "${MC_HOME}"
+    local d
+    for d in bin lib scripts; do
+      rm -rf "${MC_HOME}/${d}"
+      cp -R "${MC_ROOT}/${d}" "${MC_HOME}/${d}"
+    done
+    cp -f "${MC_ROOT}/VERSION" "${MC_HOME}/VERSION"
+    mkdir -p "${MC_HOME}/resources"
+    cp -f "${MC_ROOT}/resources/icon.icns" "${MC_HOME}/resources/icon.icns" 2>/dev/null
+    chmod +x "${MC_HOME}/bin/${MC_CLI_NAME}" "${MC_HOME}"/scripts/*.sh
+  fi
+
+  # Remember who manages this copy so `macconvert update` points the right way.
+  if [[ "${MC_ROOT}" == */Cellar/* ]]; then
+    mc_config_set install_method brew
+  fi
+
+  exec "${MC_HOME}/bin/${MC_CLI_NAME}" "$@"
+}
+
+# --------------------------------------------------------------------------
 # Helpers shared by commands
 # --------------------------------------------------------------------------
 
@@ -311,6 +351,7 @@ EOF
 # ---------------------------------------------------------------------------
 
 main() {
+  mc_bootstrap "$@"
   local cmd="${1:-}"
   (( $# )) && shift
   case "${cmd}" in

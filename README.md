@@ -25,21 +25,20 @@ upload your files to some converter website.
 ## Install
 
 ```sh
+brew install pehqge/tap/macconvert
+macconvert setup
+```
+
+Or from a clone, if you'd rather see what you're running:
+
+```sh
 git clone https://github.com/pehqge/macconvert.git
 cd macconvert && ./install.sh
 ```
 
-There's also a one-liner, if that's more your style. The script is short and
-worth a skim first ([install.sh](install.sh)):
-
-```sh
-zsh -c "$(curl -fsSL https://raw.githubusercontent.com/pehqge/macconvert/main/install.sh)"
-```
-
-The installer opens an interactive picker where you choose which Quick
-Actions you want, and it only installs the dependencies for what you picked.
-If you skip everything video-related, ffmpeg never touches your disk.
-Homebrew is the one thing you need beforehand.
+Setup opens an interactive picker where you choose which Quick Actions you
+want, and it only installs the dependencies for what you picked. If you skip
+everything video-related, ffmpeg never touches your disk.
 
 <p align="center">
   <img src="assets/demo.gif" alt="macconvert menu: interactive picker for enabling and disabling Quick Actions" width="760">
