@@ -1,7 +1,7 @@
 <h1 align="center">MacConvert</h1>
 
 <p align="center">
-  <em>Convert files from Finder's right-click menu. 45 native Quick Actions, no app windows, no uploads.</em>
+  <em>Convert files from Finder's right-click menu. 45 native Quick Actions.</em>
 </p>
 
 <p align="center">
