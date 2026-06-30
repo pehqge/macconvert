@@ -63,7 +63,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   through the same `automator` path Finder uses, including multi-select,
   filename edge cases and collision suffixing.
 
-[1.2.0]: https://github.com/pehqge/macconvert/releases/tag/v1.2.0
-[1.1.1]: https://github.com/pehqge/macconvert/releases/tag/v1.1.1
-[1.1.0]: https://github.com/pehqge/macconvert/releases/tag/v1.1.0
-[1.0.0]: https://github.com/pehqge/macconvert/releases/tag/v1.0.0
+[1.2.0]: https://github.com/pehqge/homebrew-macconvert/releases/tag/v1.2.0
+[1.1.1]: https://github.com/pehqge/homebrew-macconvert/releases/tag/v1.1.1
+[1.1.0]: https://github.com/pehqge/homebrew-macconvert/releases/tag/v1.1.0
+[1.0.0]: https://github.com/pehqge/homebrew-macconvert/releases/tag/v1.0.0

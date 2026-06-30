@@ -30,3 +30,35 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
+
+  formula:
+    name: Bump Homebrew formula
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Update formula url + sha256
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          url="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${TAG}.tar.gz"
+          sha="$(curl -sL "$url" | sha256sum | cut -d' ' -f1)"
+          f=Formula/macconvert.rb
+          sed -i -E "s|^  url \".*\"|  url \"${url}\"|" "$f"
+          sed -i -E "s|^  sha256 \".*\"|  sha256 \"${sha}\"|" "$f"
+          echo "Pinned $TAG -> $sha"
+
+      - name: Commit
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/macconvert.rb
+          git diff --cached --quiet || git commit -m "chore: bump formula to ${TAG}"
+          git push

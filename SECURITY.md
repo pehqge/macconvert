@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report vulnerabilities privately via
-[GitHub Security Advisories](https://github.com/pehqge/macconvert/security/advisories/new).
+[GitHub Security Advisories](https://github.com/pehqge/homebrew-macconvert/security/advisories/new).
 You should get a response within a few days.
 
 ## Security model

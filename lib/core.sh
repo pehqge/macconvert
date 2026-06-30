@@ -10,7 +10,7 @@
 readonly MC_APP_NAME="MacConvert"            # human-facing name
 readonly MC_CLI_NAME="macconvert"            # binary / config-dir name
 readonly MC_BUNDLE_PREFIX="com.macconvert"   # CFBundleIdentifier prefix
-readonly MC_REPO="pehqge/macconvert"         # GitHub owner/repo, used by updater
+readonly MC_REPO="pehqge/homebrew-macconvert"         # GitHub owner/repo, used by updater
 readonly MC_TAP_FORMULA="pehqge/tap/macconvert"  # Homebrew tap formula
 readonly MC_WORKFLOW_PREFIX="${MC_APP_NAME} - "  # on-disk Services filename prefix
 

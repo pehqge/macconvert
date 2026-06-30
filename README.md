@@ -5,8 +5,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/pehqge/macconvert/actions/workflows/ci.yml"><img src="https://github.com/pehqge/macconvert/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/pehqge/macconvert/releases"><img src="https://img.shields.io/github/v/release/pehqge/macconvert?color=blue" alt="Release"></a>
+  <a href="https://github.com/pehqge/homebrew-macconvert/actions/workflows/ci.yml"><img src="https://github.com/pehqge/homebrew-macconvert/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/pehqge/homebrew-macconvert/releases"><img src="https://img.shields.io/github/v/release/pehqge/homebrew-macconvert?color=blue" alt="Release"></a>
   <img src="https://img.shields.io/badge/macOS-12%2B%20·%20Apple%20Silicon%20%26%20Intel-black?logo=apple" alt="macOS">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
   <a href="https://github.com/sponsors/pehqge"><img src="https://img.shields.io/badge/sponsor-%E2%9D%A4-db61a2?logo=githubsponsors&logoColor=white" alt="Sponsor"></a>
@@ -25,15 +25,15 @@ upload your files to some converter website.
 ## Install
 
 ```sh
-brew install pehqge/tap/macconvert
+brew install pehqge/macconvert/macconvert
 macconvert setup
 ```
 
 Or from a clone, if you'd rather see what you're running:
 
 ```sh
-git clone https://github.com/pehqge/macconvert.git
-cd macconvert && ./install.sh
+git clone https://github.com/pehqge/homebrew-macconvert.git
+cd homebrew-macconvert && ./install.sh
 ```
 
 Setup opens an interactive picker where you choose which Quick Actions you

@@ -2,7 +2,7 @@
 # MacConvert installer.
 #
 #   From a clone:   ./install.sh
-#   One-liner:      zsh -c "$(curl -fsSL https://raw.githubusercontent.com/pehqge/macconvert/main/install.sh)"
+#   One-liner:      zsh -c "$(curl -fsSL https://raw.githubusercontent.com/pehqge/homebrew-macconvert/main/install.sh)"
 #
 # What it does, in order:
 #   1. copies the runtime to ~/Library/Application Support/MacConvert
@@ -29,7 +29,7 @@ fi
 set -u
 set -o pipefail
 
-readonly REPO="pehqge/macconvert"
+readonly REPO="pehqge/homebrew-macconvert"
 readonly APP_NAME="MacConvert"
 readonly CLI_NAME="macconvert"
 readonly RUNTIME_DIR="${HOME}/Library/Application Support/${APP_NAME}"
